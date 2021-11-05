@@ -12,7 +12,7 @@ code {
     monospace;
 }
 
-h1 {
+/* h1 {
   position: absolute;
   top: 1rem;
   left: 1rem;
@@ -20,13 +20,12 @@ h1 {
   z-index: 10;
   margin: 0;
   padding: 0;
-}
+} */
 
 .search {
   position: absolute;
   top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 1rem;
   width: 100%;
   max-width: 400px;
   z-index: 10;
@@ -36,18 +35,14 @@ h1 {
   padding: 0.5rem;
   font-size: 1.5rem;
   width: 100%;
+  border-radius: 10px;
 }
 
-.locate {
+.address-list-wrapper{
   position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: none;
-  border: none;
-  z-index: 10;
-}
+  top: 0;
+  right: 0;
+  width: 28vw;
+  height: 100vw;
 
-.locate img {
-  width: 30px;
-  cursor: pointer;
 }

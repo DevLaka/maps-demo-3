@@ -9,6 +9,7 @@ import {
 import usePlacesAutocomplete, {
   getGeocode,
   getLatLng,
+  // getDetails,
 } from "use-places-autocomplete";
 import {
   Combobox,
@@ -18,10 +19,13 @@ import {
   ComboboxOption,
 } from "@reach/combobox";
 import "@reach/combobox/styles.css";
+import Geocode from "react-geocode";
+import AddressList from "./AddressList";
+import AddressDataService from "./services/address.service";
 
 const libraries = ["places"];
 const mapContainerStyle = {
-  width: "100vw",
+  width: "70vw",
   height: "100vh",
 };
 const center = {
@@ -38,11 +42,26 @@ function App() {
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
     libraries: libraries,
   });
+  Geocode.setApiKey(process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
+  Geocode.setLocationType("ROOFTOP");
+
+  React.useEffect(async () => {
+    const addresses = await AddressDataService.getAll();
+    console.log("Addresses: ", addresses.data);
+    addresses.data.map( (address) => {
+      console.log(address.formatted_address);
+      setAddresses((addresses) => [...addresses, address.formatted_address]);
+    });
+
+  }, [])
 
   const [markers, setMarkers] = React.useState([]);
   const [selected, setSelected] = React.useState(null);
+  const [addresses, setAddresses] = React.useState([]);
+  const [selectedMarkerAddress, setSelectedMarkerAddress] = React.useState([]);
 
-  const onMapClick = React.useCallback((event) => {
+  const onMapClick = React.useCallback(async (event) => {
+    console.log(event);
     setMarkers((current) => [
       ...current,
       {
@@ -51,7 +70,23 @@ function App() {
         time: new Date(),
       },
     ]);
+    const response = await getMarkerAddress(
+      event.latLng.lat(),
+      event.latLng.lng()
+    );
+    setAddresses((addresses) => [...addresses, response.address]);
+    AddressDataService.create({ addressData: response.reqObj }).then((res) =>
+      console.log(res)
+    );
   }, []);
+
+  const onMarkerClick = async (marker) => {
+    console.log("calling on marker click");
+    setSelected(marker);
+    const response = await getMarkerAddress(marker.lat, marker.lng);
+    console.log("response: ", response);
+    setSelectedMarkerAddress(response.address);
+  };
 
   const mapRef = React.useRef();
   const onMapLoad = React.useCallback((map) => {
@@ -63,12 +98,54 @@ function App() {
     mapRef.current.setZoom(14);
   }, []);
 
+  const getMarkerAddress = async (lat, lng) => {
+    console.log("calling");
+    let address = "address not found";
+    let requestObj = {
+      street_number: null,
+      route: null,
+      political: null,
+      locality: null,
+      administrative_area_level_2: null,
+      administrative_area_level_1: null,
+      country: null,
+      postal_code: null,
+      plus_code: null,
+      subpremise: null,
+      premise: null,
+      formatted_address: null
+    };
+    await Geocode.fromLatLng(lat, lng).then(
+      (response) => {
+        console.log("response from getMarkerAddress", response.results[0].address_components);
+        response.results[0].address_components.map((address) => {
+          console.log("ADD: ", address);
+          for( let key in requestObj){
+            if(requestObj.hasOwnProperty(key) && key === address.types[0]){
+              requestObj[key] = address.long_name;
+            }
+          }  
+        });
+        address = response.results[0].formatted_address;
+        requestObj.formatted_address = address;
+        console.log("request obj", requestObj);
+        console.log("adress: ", address);
+      },
+      (error) => {
+        console.error(error);
+      }
+    );
+    return {
+      "address": address,
+      "reqObj": requestObj
+    };
+  };
+
   if (loadError) return "Error Loading maps";
-  if (!isLoaded) return "Lading Maps";
+  if (!isLoaded) return "Loading Maps";
 
   return (
     <div className="App">
-      <h1> Map Demo </h1>
       <Search panTo={panTo} />
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
@@ -82,19 +159,19 @@ function App() {
           <Marker
             key={marker.time.toISOString()}
             position={{ lat: marker.lat, lng: marker.lng }}
-            onClick={() => setSelected(marker)}
+            onClick={() => onMarkerClick(marker)}
           />
         ))}
         {selected ? (
           <InfoWindow position={{ lat: selected.lat, lng: selected.lng }}>
             <div>
-              <p>The adress goes here</p>
-              <p>{selected.lat}</p>
-              <p>{selected.lng}</p>
+              <p>Address :</p>
+              <p>{selectedMarkerAddress}</p>
             </div>
           </InfoWindow>
         ) : null}
       </GoogleMap>
+      <AddressList addresses={addresses} />
     </div>
   );
 }
@@ -121,7 +198,7 @@ function Search({ panTo }) {
           clearSuggestions();
           try {
             const results = await getGeocode({ address });
-            console.log(results);
+            console.log("GetGeocode: ", results);
             const { lat, lng } = await getLatLng(results[0]);
             console.log(lat, lng);
             panTo({ lat, lng });
